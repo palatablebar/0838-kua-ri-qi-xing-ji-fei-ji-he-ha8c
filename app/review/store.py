@@ -29,6 +29,15 @@ class Store:
               payload TEXT NOT NULL,
               comment TEXT NOT NULL DEFAULT ''
             );
+            CREATE TABLE IF NOT EXISTS corrections(
+              id TEXT PRIMARY KEY,
+              run_id TEXT NOT NULL,
+              evidence_key TEXT NOT NULL,
+              status TEXT NOT NULL,
+              detail TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              UNIQUE(run_id, evidence_key)
+            );
             ''')
 
     def find_by_request(self, request_key):
@@ -63,3 +72,31 @@ class Store:
             db.execute("UPDATE runs SET status=?, revision=revision+1, comment=? WHERE id=?",
                        (decision, comment, run_id))
         return self.get(run_id), None
+
+    def find_correction(self, run_id, evidence_key):
+        with self.connect() as db:
+            row = db.execute("SELECT * FROM corrections WHERE run_id=? AND evidence_key=?",
+                             (run_id, evidence_key)).fetchone()
+        return dict(row) if row else None
+
+    def get_correction(self, correction_id):
+        with self.connect() as db:
+            row = db.execute("SELECT * FROM corrections WHERE id=?", (correction_id,)).fetchone()
+        return dict(row) if row else None
+
+    def create_correction(self, run_id, evidence_key, status, detail):
+        existing = self.find_correction(run_id, evidence_key)
+        if existing:
+            return existing, False
+        correction_id = uuid.uuid4().hex[:12]
+        with self.connect() as db:
+            db.execute("INSERT INTO corrections(id,run_id,evidence_key,status,detail,created_at) VALUES(?,?,?,?,?,?)",
+                       (correction_id, run_id, evidence_key, status, json.dumps(detail, ensure_ascii=False),
+                        datetime.now(timezone.utc).isoformat()))
+        return self.get_correction(correction_id), True
+
+    def list_corrections(self, run_id):
+        with self.connect() as db:
+            rows = db.execute("SELECT * FROM corrections WHERE run_id=? ORDER BY created_at, id",
+                              (run_id,)).fetchall()
+        return [dict(row) for row in rows]

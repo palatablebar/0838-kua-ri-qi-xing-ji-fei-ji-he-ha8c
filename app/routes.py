@@ -2,6 +2,8 @@ from flask import Blueprint, abort, jsonify, request, send_file
 
 from app.catalog import SPEC
 from app.config import SAMPLES
+from app.correction.service import serialize as serialize_correction
+from app.correction.service import submit as submit_correction
 from app.errors import DomainIssue
 from app.evidence.render import render
 from app.review.service import approve, create_run, serialize
@@ -25,7 +27,7 @@ def catalog():
                        ["intake", "prepare", "calculate", "decision", "reconcile", "review", "evidence"],
                        SPEC["stages"])],
                    chart=SPEC["chart"], result_columns=SPEC["result_columns"],
-                   columns=SPEC["columns"], samples=["dirty", "clean"])
+                   columns=SPEC["columns"], samples=["dirty", "clean", "late"])
 
 
 @api.post("/api/stages/<stage_id>")
@@ -68,8 +70,25 @@ def evidence(run_id):
     return jsonify(render(run))
 
 
+@api.post("/api/runs/<run_id>/corrections")
+def create_correction(run_id):
+    data = request.get_json(silent=True) or {}
+    supplement = data.get("supplement")
+    if not isinstance(supplement, list) or not supplement:
+        raise DomainIssue("BAD_REQUEST")
+    return jsonify(submit_correction(store(), run_id, supplement))
+
+
+@api.get("/api/runs/<run_id>/corrections")
+def corrections(run_id):
+    if store().get(run_id) is None:
+        raise DomainIssue("RUN_NOT_FOUND", 404)
+    records = [serialize_correction(row) for row in store().list_corrections(run_id)]
+    return jsonify(run_id=run_id, corrections=records)
+
+
 @api.get("/api/examples/<profile>")
 def example(profile):
-    if profile not in {"clean", "dirty"}:
+    if profile not in {"clean", "dirty", "late"}:
         abort(404)
     return send_file(SAMPLES / f"{profile}.csv", as_attachment=True)

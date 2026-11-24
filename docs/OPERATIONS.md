@@ -16,6 +16,7 @@ docker compose exec -T app pytest -q
 
 - `dirty`：包含编码、列数、空值或冲突重复，适合检查隔离区。
 - `clean`：可通过当前规则并完成签发。
+- `late`：跨日且含暂停的骑行，用于演示签发后晚到补证的更正。
 
 ## 重置
 

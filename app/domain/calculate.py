@@ -2,6 +2,15 @@ from datetime import date, timedelta
 from app.catalog import SPEC
 from app.domain.helpers import *  # noqa: F401,F403
 
+BASE_FARE = 100
+FREE_MINUTES = 15
+STEP_FARE = 10
+DAY_CAP = 400
+
+
+def day_fare(minutes):
+    return min(BASE_FARE + max(0, minutes - FREE_MINUTES) * STEP_FARE, DAY_CAP) if minutes else 0
+
 
 def calculate_rows(items):
     out = []
@@ -18,7 +27,7 @@ def calculate_rows(items):
             consumed = min(pause_seconds, seconds)
             pause_seconds -= consumed
             minutes = (seconds - consumed + 59) // 60
-            day_fares.append(min(100 + max(0, minutes - 15) * 10, 400) if minutes else 0)
+            day_fares.append(day_fare(minutes))
             cursor = boundary
         fare = sum(day_fares)
         item["fare"] = fare
